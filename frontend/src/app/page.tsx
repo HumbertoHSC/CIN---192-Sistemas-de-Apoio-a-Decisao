@@ -40,6 +40,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { RankingChart } from "./components/RankingChart";
 import { GaiaPlane } from "./components/GaiaPlane";
+import { CriteriaWeightsChart } from "./components/CriteriaWeightsChart";
+import { FlowQuadrantChart } from "./components/FlowQuadrantChart";
+import { PreferenceHeatmap } from "./components/PreferenceHeatmap";
 
 // Exemplo pré-carregado: escolha de um carro (custo, conforto, consumo).
 const EXAMPLE: {
@@ -337,6 +340,47 @@ export default function Home() {
           </CardContent>
         </Card>
 
+        <div className="mb-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <Card className="[--card-spacing:--spacing(5)]">
+            <CardHeader>
+              <CardTitle>Distribuição dos pesos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CriteriaWeightsChart criteria={criteria} />
+              <div className="grid grid-cols-3 gap-3">
+                <MetricTile label="Critérios" value={criteria.length.toString()} />
+                <MetricTile label="Alternativas" value={alternatives.length.toString()} />
+                <MetricTile label="Σ pesos" value={weightSum.toFixed(2)} tone={weightSum > 0 ? "positive" : "warning"} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="[--card-spacing:--spacing(5)]">
+            <CardHeader>
+              <CardTitle>Arquitetura do modelo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {criteria.map((c) => (
+                  <div key={c.name} className="rounded-lg border bg-muted/20 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium leading-tight">{c.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {c.maximize ? "Maximizar" : "Minimizar"} · {PREFERENCE_LABELS[c.preference]}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="tnum shrink-0">
+                        {Number(c.weight || 0).toFixed(2)}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="mb-10 flex flex-wrap items-center gap-4">
           <Button size="lg" onClick={handleSolve} disabled={loading} className="px-6">
             {loading ? "Calculando…" : "Calcular ranking"}
@@ -351,6 +395,8 @@ export default function Home() {
         {/* ---------------- Resultados ---------------- */}
         {result && (
           <section key={result.scores.map((s) => s.name + s.phi_net).join()} className="ph-rise space-y-6">
+            <ResultOverview result={result} />
+
             <Card className="[--card-spacing:--spacing(5)]">
               <CardHeader>
                 <CardTitle>Ranking · PROMETHEE II</CardTitle>
@@ -364,61 +410,82 @@ export default function Home() {
                 </CardAction>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Alternativa</TableHead>
-                      <TableHead className="text-right">φ⁺</TableHead>
-                      <TableHead className="text-right">φ⁻</TableHead>
-                      <TableHead className="text-right">φ líquido</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...result.scores]
-                      .sort((a, b) => a.rank - b.rank)
-                      .map((s) => (
-                        <TableRow
-                          key={s.name}
-                          className={s.rank === 1 ? "bg-accent/40" : undefined}
-                        >
-                          <TableCell>
-                            <Badge
-                              variant={s.rank === 1 ? "default" : "secondary"}
-                              className="tnum h-6 w-6 justify-center rounded-md p-0"
-                            >
-                              {s.rank}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            <span className="inline-flex items-center gap-1.5">
-                              {s.name}
-                              {s.rank === 1 && (
-                                <Crown className="size-3.5 text-chart-3" aria-label="Melhor alternativa" />
-                              )}
-                            </span>
-                          </TableCell>
-                          <TableCell className="tnum text-right text-muted-foreground">
-                            {s.phi_plus.toFixed(4)}
-                          </TableCell>
-                          <TableCell className="tnum text-right text-muted-foreground">
-                            {s.phi_minus.toFixed(4)}
-                          </TableCell>
-                          <TableCell
-                            className={`tnum text-right font-medium ${
-                              s.phi_net >= 0 ? "text-primary" : "text-destructive"
-                            }`}
-                          >
-                            {s.phi_net >= 0 ? "+" : ""}
-                            {s.phi_net.toFixed(4)}
-                          </TableCell>
+                <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-12">#</TableHead>
+                          <TableHead>Alternativa</TableHead>
+                          <TableHead className="text-right">φ⁺</TableHead>
+                          <TableHead className="text-right">φ⁻</TableHead>
+                          <TableHead className="text-right">φ líquido</TableHead>
                         </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {[...result.scores]
+                          .sort((a, b) => a.rank - b.rank)
+                          .map((s) => (
+                            <TableRow
+                              key={s.name}
+                              className={s.rank === 1 ? "bg-accent/40" : undefined}
+                            >
+                              <TableCell>
+                                <Badge
+                                  variant={s.rank === 1 ? "default" : "secondary"}
+                                  className="tnum h-6 w-6 justify-center rounded-md p-0"
+                                >
+                                  {s.rank}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                <span className="inline-flex items-center gap-1.5">
+                                  {s.name}
+                                  {s.rank === 1 && (
+                                    <Crown className="size-3.5 text-chart-3" aria-label="Melhor alternativa" />
+                                  )}
+                                </span>
+                              </TableCell>
+                              <TableCell className="tnum text-right text-muted-foreground">
+                                {s.phi_plus.toFixed(4)}
+                              </TableCell>
+                              <TableCell className="tnum text-right text-muted-foreground">
+                                {s.phi_minus.toFixed(4)}
+                              </TableCell>
+                              <TableCell
+                                className={`tnum text-right font-medium ${
+                                  s.phi_net >= 0 ? "text-primary" : "text-destructive"
+                                }`}
+                              >
+                                {s.phi_net >= 0 ? "+" : ""}
+                                {s.phi_net.toFixed(4)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/10 p-4">
+                    <h3 className="mb-3 text-sm font-medium">Diagnóstico dos fluxos</h3>
+                    <FlowQuadrantChart scores={result.scores} />
+                  </div>
+                </div>
 
                 <Separator />
                 <RankingChart scores={result.scores} />
+              </CardContent>
+            </Card>
+
+            <Card className="[--card-spacing:--spacing(5)]">
+              <CardHeader>
+                <CardTitle>Preferência agregada</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PreferenceHeatmap
+                  alternatives={alternatives}
+                  preferenceIndex={result.preference_index}
+                />
               </CardContent>
             </Card>
 
@@ -449,4 +516,86 @@ function StepMarker({ n }: { n: number }) {
       {n}
     </span>
   );
+}
+
+function MetricTile({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "positive" | "warning";
+}) {
+  const toneClass =
+    tone === "positive"
+      ? "text-primary"
+      : tone === "warning"
+        ? "text-destructive"
+        : "text-foreground";
+
+  return (
+    <div className="rounded-lg border bg-card px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`tnum mt-1 text-lg font-semibold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function ResultOverview({ result }: { result: SolveResponse }) {
+  const ordered = [...result.scores].sort((a, b) => a.rank - b.rank);
+  const best = ordered[0];
+  const runnerUp = ordered[1];
+  const gap = best && runnerUp ? best.phi_net - runnerUp.phi_net : 0;
+  const positiveCount = result.scores.filter((s) => s.phi_net >= 0).length;
+  const gaiaQuality = result.gaia ? `${(result.gaia.quality * 100).toFixed(1)}%` : "-";
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <MetricCard
+        label="Melhor compromisso"
+        value={best?.name ?? "-"}
+        detail={best ? `φ líquido ${formatSigned(best.phi_net)}` : "-"}
+      />
+      <MetricCard
+        label="Folga para o 2º"
+        value={formatSigned(gap)}
+        detail={runnerUp ? `contra ${runnerUp.name}` : "-"}
+      />
+      <MetricCard
+        label="Alternativas positivas"
+        value={`${positiveCount}/${result.scores.length}`}
+        detail="φ líquido maior ou igual a zero"
+      />
+      <MetricCard
+        label="Qualidade GAIA"
+        value={gaiaQuality}
+        detail="variância preservada no plano"
+      />
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <Card className="[--card-spacing:--spacing(4)]">
+      <CardContent>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="mt-2 truncate text-xl font-semibold tracking-tight">{value}</p>
+        <p className="tnum mt-1 text-xs text-muted-foreground">{detail}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatSigned(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(4)}`;
 }
