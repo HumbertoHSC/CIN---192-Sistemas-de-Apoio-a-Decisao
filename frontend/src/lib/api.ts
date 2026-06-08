@@ -12,6 +12,12 @@ export type PreferenceType =
   | "linear"
   | "gaussian";
 
+// Um termo de uma escala qualitativa: rótulo linguístico → valor numérico.
+export interface ScaleTerm {
+  term: string;
+  value: number;
+}
+
 export interface CriterionInput {
   name: string;
   weight: number;
@@ -20,6 +26,9 @@ export interface CriterionInput {
   q?: number | null;
   p?: number | null;
   s?: number | null;
+  // Quando presente, o critério é qualitativo: as células da matriz são
+  // escolhidas entre estes termos (a matriz enviada à API continua numérica).
+  scale?: ScaleTerm[] | null;
 }
 
 export interface SolveRequest {
@@ -74,11 +83,19 @@ export const PREFERENCE_LABELS: Record<PreferenceType, string> = {
   gaussian: "Tipo VI — Gaussiana",
 };
 
+// A escala qualitativa é um conceito de frontend; o backend só recebe números.
+function sanitizeRequest(req: SolveRequest): SolveRequest {
+  return {
+    ...req,
+    criteria: req.criteria.map(({ scale, ...c }) => c),
+  };
+}
+
 async function postJson<T>(path: string, body: SolveRequest): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(sanitizeRequest(body)),
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
@@ -108,7 +125,7 @@ export async function exportFile(
   const res = await fetch(`${API_URL}/api/export/${format}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify(sanitizeRequest(req)),
   });
   if (!res.ok) throw new Error(`Falha ao exportar ${format.toUpperCase()}`);
   const blob = await res.blob();

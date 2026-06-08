@@ -1,17 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Crown, Download, Plus, X } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Crown, Download, ListOrdered, Plus, X } from "lucide-react";
 import {
   CriterionInput,
   PreferenceType,
   PREFERENCE_LABELS,
   PREFERENCE_PARAMS,
+  ScaleTerm,
   SolveRequest,
   SolveResponse,
   exportFile,
   solve,
 } from "@/lib/api";
+import { TEMPLATES, type Problem } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,35 +45,21 @@ import { GaiaPlane } from "./components/GaiaPlane";
 import { CriteriaWeightsChart } from "./components/CriteriaWeightsChart";
 import { FlowQuadrantChart } from "./components/FlowQuadrantChart";
 import { PreferenceHeatmap } from "./components/PreferenceHeatmap";
+import { PreferenceFunctionChart } from "./components/PreferenceFunctionChart";
+import { ProblemBar } from "./components/ProblemBar";
 
-// Exemplo pré-carregado: escolha de um carro (custo, conforto, consumo).
-const EXAMPLE: {
-  alternatives: string[];
-  criteria: CriterionInput[];
-  matrix: number[][];
-} = {
-  alternatives: ["Carro A", "Carro B", "Carro C", "Carro D"],
-  criteria: [
-    { name: "Preço (R$ mil)", weight: 0.35, maximize: false, preference: "linear", q: 5, p: 20 },
-    { name: "Conforto (1-10)", weight: 0.25, maximize: true, preference: "v_shape", p: 3 },
-    { name: "Consumo (km/l)", weight: 0.25, maximize: true, preference: "usual" },
-    { name: "Potência (cv)", weight: 0.15, maximize: true, preference: "gaussian", s: 20 },
-  ],
-  matrix: [
-    [80, 7, 12, 110],
-    [65, 5, 15, 90],
-    [95, 9, 10, 140],
-    [72, 6, 14, 100],
-  ],
-};
+// Ponto de partida editável (também disponível como template).
+const EXAMPLE: Problem = TEMPLATES[0].problem;
 
 const PREFERENCE_TYPES = Object.keys(PREFERENCE_LABELS) as PreferenceType[];
 const PARAM_KEYS = ["q", "p", "s"] as const;
 
 export default function Home() {
+  const [name, setName] = useState<string>(EXAMPLE.name);
   const [alternatives, setAlternatives] = useState<string[]>(EXAMPLE.alternatives);
   const [criteria, setCriteria] = useState<CriterionInput[]>(EXAMPLE.criteria);
   const [matrix, setMatrix] = useState<number[][]>(EXAMPLE.matrix);
+  const [openScale, setOpenScale] = useState<number | null>(null);
   const [result, setResult] = useState<SolveResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,6 +71,19 @@ export default function Home() {
 
   function buildRequest(): SolveRequest {
     return { alternatives, criteria, matrix };
+  }
+
+  // Estado atual como um Problem completo (para salvar/exportar).
+  const problem: Problem = { name, alternatives, criteria, matrix };
+
+  function loadProblem(p: Problem) {
+    setName(p.name);
+    setAlternatives(p.alternatives);
+    setCriteria(p.criteria);
+    setMatrix(p.matrix);
+    setOpenScale(null);
+    setResult(null);
+    setError(null);
   }
 
   async function handleSolve() {
@@ -127,6 +128,48 @@ export default function Home() {
     setMatrix((m) => m.map((row, ri) => (ri === i ? row.map((c, ci) => (ci === j ? value : c)) : row)));
   }
 
+  // --- escalas qualitativas (termos) --------------------------------------
+  // Converte o critério j para qualitativo (cria escala padrão) ou volta a
+  // numérico (remove a escala). Ao virar qualitativo, snapa a coluna ao 1º termo.
+  function toggleQualitative(j: number, enabled: boolean) {
+    if (enabled) {
+      const scale: ScaleTerm[] = [
+        { term: "Baixo", value: 1 },
+        { term: "Médio", value: 2 },
+        { term: "Alto", value: 3 },
+      ];
+      updateCriterion(j, { scale });
+      setMatrix((m) => m.map((row) => row.map((c, ci) => (ci === j ? scale[0].value : c))));
+    } else {
+      updateCriterion(j, { scale: null });
+    }
+  }
+  function updateTerm(j: number, t: number, patch: Partial<ScaleTerm>) {
+    setCriteria((cs) =>
+      cs.map((c, k) =>
+        k === j && c.scale ? { ...c, scale: c.scale.map((s, ti) => (ti === t ? { ...s, ...patch } : s)) } : c,
+      ),
+    );
+  }
+  function addTerm(j: number) {
+    setCriteria((cs) =>
+      cs.map((c, k) => {
+        if (k !== j || !c.scale) return c;
+        const nextVal = c.scale.length ? Math.max(...c.scale.map((s) => s.value)) + 1 : 1;
+        return { ...c, scale: [...c.scale, { term: `Termo ${c.scale.length + 1}`, value: nextVal }] };
+      }),
+    );
+  }
+  function removeTerm(j: number, t: number) {
+    setCriteria((cs) =>
+      cs.map((c, k) =>
+        k === j && c.scale && c.scale.length > 1
+          ? { ...c, scale: c.scale.filter((_, ti) => ti !== t) }
+          : c,
+      ),
+    );
+  }
+
   return (
     <div className="min-h-[100dvh]">
       <main className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
@@ -145,6 +188,14 @@ export default function Home() {
             φ⁺, φ⁻ e φ líquido.
           </p>
         </header>
+
+        {/* ---------------- 0. Problema ---------------- */}
+        <ProblemBar
+          problem={problem}
+          name={name}
+          onNameChange={setName}
+          onLoad={loadProblem}
+        />
 
         {/* ---------------- 1. Critérios ---------------- */}
         <Card className="mb-6 [--card-spacing:--spacing(5)]">
@@ -180,14 +231,23 @@ export default function Home() {
                 <TableBody>
                   {criteria.map((c, i) => {
                     const params = PREFERENCE_PARAMS[c.preference];
+                    const isQualitative = Array.isArray(c.scale);
                     return (
-                      <TableRow key={i}>
+                      <Fragment key={i}>
+                      <TableRow>
                         <TableCell>
-                          <Input
-                            className="w-44"
-                            value={c.name}
-                            onChange={(e) => updateCriterion(i, { name: e.target.value })}
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              className="w-44"
+                              value={c.name}
+                              onChange={(e) => updateCriterion(i, { name: e.target.value })}
+                            />
+                            {isQualitative && (
+                              <Badge variant="secondary" className="shrink-0 font-normal">
+                                termos
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Input
@@ -250,18 +310,48 @@ export default function Home() {
                           </TableCell>
                         ))}
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => removeCriterion(i)}
-                            aria-label={`Remover ${c.name}`}
-                            disabled={criteria.length <= 1}
-                          >
-                            <X />
-                          </Button>
+                          <div className="flex items-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className={
+                                isQualitative || openScale === i
+                                  ? "text-primary"
+                                  : "text-muted-foreground"
+                              }
+                              onClick={() => setOpenScale((o) => (o === i ? null : i))}
+                              aria-label={`Escala qualitativa de ${c.name}`}
+                              aria-pressed={openScale === i}
+                            >
+                              <ListOrdered />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => removeCriterion(i)}
+                              aria-label={`Remover ${c.name}`}
+                              disabled={criteria.length <= 1}
+                            >
+                              <X />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
+                      {openScale === i && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={8} className="bg-muted/20">
+                            <ScaleEditor
+                              criterion={c}
+                              onToggle={(enabled) => toggleQualitative(i, enabled)}
+                              onTerm={(t, patch) => updateTerm(i, t, patch)}
+                              onAdd={() => addTerm(i)}
+                              onRemove={(t) => removeTerm(i, t)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </TableBody>
@@ -309,15 +399,34 @@ export default function Home() {
                           }
                         />
                       </TableCell>
-                      {criteria.map((_, j) => (
+                      {criteria.map((c, j) => (
                         <TableCell key={j}>
-                          <Input
-                            type="number"
-                            step="any"
-                            className="tnum w-24"
-                            value={matrix[i]?.[j] ?? 0}
-                            onChange={(e) => updateCell(i, j, Number(e.target.value))}
-                          />
+                          {c.scale ? (
+                            <Select
+                              value={String(matrix[i]?.[j] ?? c.scale[0]?.value ?? 0)}
+                              onValueChange={(v) => updateCell(i, j, Number(v))}
+                            >
+                              <SelectTrigger className="w-32" size="sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {c.scale.map((t) => (
+                                  <SelectItem key={t.value} value={String(t.value)}>
+                                    {t.term}
+                                    <span className="tnum ml-1.5 text-muted-foreground">({t.value})</span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="any"
+                              className="tnum w-24"
+                              value={matrix[i]?.[j] ?? 0}
+                              onChange={(e) => updateCell(i, j, Number(e.target.value))}
+                            />
+                          )}
                         </TableCell>
                       ))}
                       <TableCell>
@@ -380,6 +489,24 @@ export default function Home() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ---------------- Funções de preferência (limiares) ---------------- */}
+        <Card className="mb-6 [--card-spacing:--spacing(5)]">
+          <CardHeader>
+            <CardTitle>Funções de preferência</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Grau de preferência P(d) em função do desvio d, com os limiares
+              q e p marcados. Atualiza ao editar os parâmetros acima.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+              {criteria.map((c, i) => (
+                <PreferenceFunctionChart key={i} criterion={c} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="mb-10 flex flex-wrap items-center gap-4">
           <Button size="lg" onClick={handleSolve} disabled={loading} className="px-6">
@@ -598,4 +725,87 @@ function MetricCard({
 
 function formatSigned(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(4)}`;
+}
+
+function ScaleEditor({
+  criterion,
+  onToggle,
+  onTerm,
+  onAdd,
+  onRemove,
+}: {
+  criterion: CriterionInput;
+  onToggle: (enabled: boolean) => void;
+  onTerm: (index: number, patch: Partial<ScaleTerm>) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  const scale = criterion.scale;
+
+  if (!scale) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 py-1">
+        <p className="max-w-[60ch] text-sm text-muted-foreground">
+          Critério numérico. Você pode usar <strong>termos qualitativos</strong>{" "}
+          (ex.: ruim/regular/bom/ótimo) mapeados a notas — o sistema calcula sobre
+          as notas.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => onToggle(true)}>
+          <ListOrdered /> Usar termos
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 py-1">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-medium">Termos qualitativos</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => onToggle(false)}
+        >
+          Voltar a numérico
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {scale.map((t, ti) => (
+          <div key={ti} className="flex items-center gap-1 rounded-md border bg-card p-1.5">
+            <Input
+              className="w-28"
+              value={t.term}
+              placeholder="Termo"
+              onChange={(e) => onTerm(ti, { term: e.target.value })}
+            />
+            <Input
+              type="number"
+              step="any"
+              className="tnum w-16"
+              value={t.value}
+              onChange={(e) => onTerm(ti, { value: Number(e.target.value) })}
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => onRemove(ti)}
+              disabled={scale.length <= 1}
+              aria-label="Remover termo"
+            >
+              <X />
+            </Button>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" onClick={onAdd}>
+          <Plus /> Termo
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        O valor numérico de cada termo é o que entra no cálculo. Defina os
+        limiares q/p na mesma escala dos valores.
+      </p>
+    </div>
+  );
 }
