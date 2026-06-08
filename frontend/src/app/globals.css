@@ -1,0 +1,171 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Map the semantic CSS variables to Tailwind theme tokens so utilities like
+   `bg-background`, `text-muted-foreground`, `border-border`, `bg-chart-1`
+   resolve. `inline` keeps them referencing the runtime variables, so the
+   light / dark values below take effect without regenerating utilities. */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ----------------------------------------------------------------------
+   Scientific-minimal palette. ONE accent (blue) across the whole page.
+   Chart tokens carry the categorical data encodings used by GAIA / ranking
+   (alternatives = blue, criteria = emerald, decision axis π = amber, negative
+   flow = rose). Those are data colours, not UI accents. Dark mode follows the
+   OS via prefers-color-scheme (no flash, no JS); the default `dark:` variant
+   stays media-based to match.
+   -------------------------------------------------------------------- */
+:root {
+  --radius: 0.625rem;
+  color-scheme: light;
+
+  --background: oklch(0.985 0.002 247);
+  --foreground: oklch(0.21 0.012 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.012 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.012 255);
+  --primary: oklch(0.546 0.196 262);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.968 0.004 250);
+  --secondary-foreground: oklch(0.27 0.012 255);
+  --muted: oklch(0.968 0.004 250);
+  --muted-foreground: oklch(0.52 0.018 256);
+  --accent: oklch(0.96 0.012 256);
+  --accent-foreground: oklch(0.3 0.06 262);
+  --destructive: oklch(0.58 0.21 17);
+  --border: oklch(0.918 0.005 256);
+  --input: oklch(0.918 0.005 256);
+  --ring: oklch(0.62 0.17 262);
+  --chart-1: oklch(0.546 0.196 262);
+  --chart-2: oklch(0.62 0.13 163);
+  --chart-3: oklch(0.72 0.16 75);
+  --chart-4: oklch(0.58 0.21 17);
+  --chart-5: oklch(0.55 0.02 256);
+  --sidebar: oklch(0.985 0.002 247);
+  --sidebar-foreground: oklch(0.21 0.012 255);
+  --sidebar-primary: oklch(0.546 0.196 262);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.96 0.012 256);
+  --sidebar-accent-foreground: oklch(0.3 0.06 262);
+  --sidebar-border: oklch(0.918 0.005 256);
+  --sidebar-ring: oklch(0.62 0.17 262);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: oklch(0.165 0.008 256);
+    --foreground: oklch(0.97 0.003 247);
+    --card: oklch(0.205 0.009 256);
+    --card-foreground: oklch(0.97 0.003 247);
+    --popover: oklch(0.205 0.009 256);
+    --popover-foreground: oklch(0.97 0.003 247);
+    --primary: oklch(0.62 0.17 262);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.27 0.01 256);
+    --secondary-foreground: oklch(0.97 0.003 247);
+    --muted: oklch(0.27 0.01 256);
+    --muted-foreground: oklch(0.7 0.02 256);
+    --accent: oklch(0.3 0.03 262);
+    --accent-foreground: oklch(0.9 0.04 262);
+    --destructive: oklch(0.7 0.19 20);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.62 0.17 262);
+    --chart-1: oklch(0.65 0.17 262);
+    --chart-2: oklch(0.7 0.14 163);
+    --chart-3: oklch(0.8 0.15 80);
+    --chart-4: oklch(0.68 0.19 18);
+    --chart-5: oklch(0.7 0.02 256);
+    --sidebar: oklch(0.205 0.009 256);
+    --sidebar-foreground: oklch(0.97 0.003 247);
+    --sidebar-primary: oklch(0.62 0.17 262);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.3 0.03 262);
+    --sidebar-accent-foreground: oklch(0.9 0.04 262);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.62 0.17 262);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@utility tnum {
+  /* Tabular mono numerals for scientific figures (flows, weights, params). */
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Single, low-key entrance for results. Motivated: it signals that fresh
+   output just arrived after "Calcular". Collapses to static under reduced
+   motion (MOTION_INTENSITY 3). */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ph-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .ph-rise {
+    animation: ph-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}

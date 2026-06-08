@@ -1,0 +1,27 @@
+# Ambiente de desenvolvimento local (backend + frontend).
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ORIGINS=http://localhost:3000
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    image: node:22-alpine
+    # Roda como o usuário do host (UID:GID) para não criar arquivos como
+    # root no diretório montado (ex.: .next/). Sobrescreva via env se o seu
+    # UID não for 1000: UID=$(id -u) GID=$(id -g) docker compose up
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
